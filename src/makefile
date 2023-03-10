@@ -5,7 +5,7 @@ CFLAGS=-I$(IDIR)
 ODIR=obj
 LDIR =../lib
 
-LIBS=-lm
+LIBS=-lcurl
 
 _DEPS = cGPT.h
 DEPS = $(patsubst %,$(IDIR)/%,$(_DEPS))
@@ -17,7 +17,7 @@ $(ODIR)/%.o: %.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)
 
 cgpt: $(OBJ)
-	$(CC) -o $@ $^ $(CFLAGS) -lcurl $(LIBS)
+	$(CC) -o $@ $^ $(CFLAGS) $(LIBS)
 	
 .PHONY: clean
 
