@@ -1,8 +1,9 @@
 #include "cGPT.h"
-#include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <curl/curl.h>
+#include "cJSON.h"
 
 ChatClient* createChatClient(char* apiKey){
     if ((apiKey == NULL) || (apiKey[0] == '\0')) {
@@ -36,9 +37,35 @@ static char* build_req_body(char *model){
     snprintf(buffer, sizeof buffer, "{\"model\": \"%s\", \"messages\": [{\"role\": \"user\", \"content\": \"Hello!\"}]}", model);
     return strdup(buffer);
 }
+static int jsonStrKeyFound(cJSON* obj){
+    return cJSON_IsString(obj) && (obj->valuestring != NULL);
+}
+static ChatResponse *parse_response(char *response){
+    // parse response using cJSON
+    cJSON* json = cJSON_Parse(response);
+    if (json != NULL) {
+        // create pointer to struct
+        ChatResponse *chatResponsePtr = malloc(sizeof(ChatResponse));
+        // start parsing away
+        cJSON* idObj = cJSON_GetObjectItemCaseSensitive(json, "id");
+        if (jsonStrKeyFound(idObj)) {
+            chatResponsePtr->id = malloc(strlen(idObj->valuestring));
+            strcpy(chatResponsePtr->id, idObj->valuestring);
+        }
+
+        cJSON* objectObj = cJSON_GetObjectItemCaseSensitive(json, "object");
+        if (jsonStrKeyFound(objectObj)) {
+            chatResponsePtr->object = malloc(strlen(objectObj->valuestring));
+            strcpy(chatResponsePtr->object, objectObj->valuestring);
+        }
+
+        cJSON_Delete(json);
+        return chatResponsePtr;
+    }
+    return 0;
+}
 // Create a completion for specified chat message
-void create_chat_completion(char *apiKey, char *model){    
-    char *reqBody = build_req_body(model);
+ChatResponse *create_chat_completion(char *apiKey, char *model){    
     CURL *curl;
     CURLcode res;
     // apparently needed for windows?
@@ -62,6 +89,7 @@ void create_chat_completion(char *apiKey, char *model){
         // make sure we send an https request
         curl_easy_setopt(curl, CURLOPT_DEFAULT_PROTOCOL, "https");
         // set request body
+        char *reqBody = build_req_body(model);
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, reqBody);
         // set size of request body
         curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)strlen(reqBody));
@@ -73,16 +101,21 @@ void create_chat_completion(char *apiKey, char *model){
         // send the http request
         res = curl_easy_perform(curl);
         // analyze response code
+        ChatResponse *chatResp;
         if (res != CURLE_OK) {
             fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
         } else {
-            printf("%lu bytes retrieved\n", (unsigned long)chunk.size);
-            printf("Response body:\n%s\n", chunk.response);
+            chatResp = parse_response(chunk.response);
         }
-        // always cleanup
+        // always cleanup so no memory leaks!
         curl_easy_cleanup(curl);
         curl_slist_free_all(headersList);
+        curl_global_cleanup();
         free(chunk.response);
+        free(reqBody);
+        
+        return chatResp;
     }
     curl_global_cleanup();
+    return 0;
 }

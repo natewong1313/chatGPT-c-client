@@ -7,10 +7,10 @@ LDIR =../lib
 
 LIBS=-lcurl
 
-_DEPS = cGPT.h
+_DEPS = cGPT.h cJSON.h
 DEPS = $(patsubst %,$(IDIR)/%,$(_DEPS))
 
-_OBJ = main.o cGPT.o 
+_OBJ = main.o cGPT.o cJSON.o
 OBJ = $(patsubst %,$(ODIR)/%,$(_OBJ))
 
 $(ODIR)/%.o: %.c $(DEPS)
