@@ -5,16 +5,6 @@
 #include <curl/curl.h>
 #include "cJSON.h"
 
-ChatClient* createChatClient(char* apiKey){
-    if ((apiKey == NULL) || (apiKey[0] == '\0')) {
-        fprintf(stderr, "Invalid API key parameter. Must be of type \"string\" with length > 0\n");
-        return NULL;
-    }
-    ChatClient* chatClient = malloc(sizeof(ChatClient));
-    chatClient->apiKey = malloc(sizeof(apiKey));
-    strcpy(chatClient->apiKey, apiKey);
-    return chatClient;
-}
 // https://curl.se/libcurl/c/CURLOPT_WRITEFUNCTION.html
 static size_t write_memory_callback(void *data, size_t size, size_t nmemb, void *clientp){
     size_t realsize = size * nmemb;
@@ -32,13 +22,36 @@ static size_t write_memory_callback(void *data, size_t size, size_t nmemb, void 
     return realsize;
 }
 
-static char* build_req_body(char *model){
-    char buffer[100];
-    snprintf(buffer, sizeof buffer, "{\"model\": \"%s\", \"messages\": [{\"role\": \"user\", \"content\": \"Hello!\"}]}", model);
-    return strdup(buffer);
+static char *build_req_body(char *model, ChatMessage *messages, int messagesSize){
+    cJSON *jBody = cJSON_CreateObject();
+    cJSON *jModel = cJSON_CreateString(model);
+    cJSON_AddItemToObject(jBody, "model", jModel);
+
+    cJSON *jMessages = cJSON_CreateArray();
+    cJSON_AddItemToObject(jBody, "messages", jMessages);
+    cJSON *jMessage = NULL;
+    cJSON *jRole = NULL;
+    cJSON *jContent = NULL;
+    for(int i = 0; i < messagesSize; i++){
+        jMessage = cJSON_CreateObject();
+        cJSON_AddItemToArray(jMessages, jMessage);
+
+        jRole = cJSON_CreateString(messages[i].role);
+        cJSON_AddItemToObject(jMessage, "role", jRole);
+
+        jContent = cJSON_CreateString(messages[i].content);
+        cJSON_AddItemToObject(jMessage, "content", jContent);
+    }
+    char *response = cJSON_Print(jBody);
+    
+    return response;
 }
+// validate value for key in json response
 static int jsonStrKeyFound(cJSON* obj){
     return cJSON_IsString(obj) && (obj->valuestring != NULL);
+}
+static int jsonIntKeyFound(cJSON* obj){
+    return cJSON_IsNumber(obj);
 }
 static ChatResponse *parse_response(char *response){
     // parse response using cJSON
@@ -59,13 +72,18 @@ static ChatResponse *parse_response(char *response){
             strcpy(chatResponsePtr->object, objectObj->valuestring);
         }
 
+        cJSON* createdObj = cJSON_GetObjectItemCaseSensitive(json, "created");
+        if (jsonIntKeyFound(createdObj)) {
+            chatResponsePtr->created = createdObj->valueint;
+        }
+
         cJSON_Delete(json);
         return chatResponsePtr;
     }
     return 0;
 }
 // Create a completion for specified chat message
-ChatResponse *create_chat_completion(char *apiKey, char *model){    
+ChatResponse *create_chat_completion(char *apiKey, char *model, ChatMessage *messages, int messagesSize){
     CURL *curl;
     CURLcode res;
     // apparently needed for windows?
@@ -89,7 +107,7 @@ ChatResponse *create_chat_completion(char *apiKey, char *model){
         // make sure we send an https request
         curl_easy_setopt(curl, CURLOPT_DEFAULT_PROTOCOL, "https");
         // set request body
-        char *reqBody = build_req_body(model);
+        char *reqBody = build_req_body(model, messages, messagesSize);
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, reqBody);
         // set size of request body
         curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)strlen(reqBody));
@@ -113,7 +131,7 @@ ChatResponse *create_chat_completion(char *apiKey, char *model){
         curl_global_cleanup();
         free(chunk.response);
         free(reqBody);
-        
+
         return chatResp;
     }
     curl_global_cleanup();
