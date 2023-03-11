@@ -3,3 +3,4 @@ build
 .env
 src/obj/**
 src/cgpt*
+.DS_Store
