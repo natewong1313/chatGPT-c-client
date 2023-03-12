@@ -5,6 +5,7 @@
 #include <curl/curl.h>
 #include "cJSON.h"
 
+// callback from the api request
 // https://curl.se/libcurl/c/CURLOPT_WRITEFUNCTION.html
 static size_t write_memory_callback(void *data, size_t size, size_t nmemb, void *clientp){
     size_t realsize = size * nmemb;
@@ -21,69 +22,68 @@ static size_t write_memory_callback(void *data, size_t size, size_t nmemb, void 
     mem->response[mem->size] = 0;
     return realsize;
 }
+// take in parameters and return json request body as string
+static char *build_req_body(char *model, ChatMessage *messages, int messages_size){
+    cJSON *body_obj = cJSON_CreateObject();
+    cJSON *model_str = cJSON_CreateString(model);
+    cJSON_AddItemToObject(body_obj, "model", model_str);
+    cJSON *messages_arr = cJSON_CreateArray();
+    cJSON_AddItemToObject(body_obj, "messages", messages_arr);
+    cJSON *message_obj = NULL;
+    cJSON *role_str = NULL;
+    cJSON *content_str = NULL;
+    for(int i = 0; i < messages_size; i++){
+        message_obj = cJSON_CreateObject();
+        cJSON_AddItemToArray(messages_arr, message_obj);
 
-static char *build_req_body(char *model, ChatMessage *messages, int messagesSize){
-    cJSON *jBody = cJSON_CreateObject();
-    cJSON *jModel = cJSON_CreateString(model);
-    cJSON_AddItemToObject(jBody, "model", jModel);
+        role_str = cJSON_CreateString(messages[i].role);
+        cJSON_AddItemToObject(message_obj, "role", role_str);
 
-    cJSON *jMessages = cJSON_CreateArray();
-    cJSON_AddItemToObject(jBody, "messages", jMessages);
-    cJSON *jMessage = NULL;
-    cJSON *jRole = NULL;
-    cJSON *jContent = NULL;
-    for(int i = 0; i < messagesSize; i++){
-        jMessage = cJSON_CreateObject();
-        cJSON_AddItemToArray(jMessages, jMessage);
-
-        jRole = cJSON_CreateString(messages[i].role);
-        cJSON_AddItemToObject(jMessage, "role", jRole);
-
-        jContent = cJSON_CreateString(messages[i].content);
-        cJSON_AddItemToObject(jMessage, "content", jContent);
+        content_str = cJSON_CreateString(messages[i].content);
+        cJSON_AddItemToObject(message_obj, "content", content_str);
     }
-    char *response = cJSON_Print(jBody);
-    
-    return response;
+    // char *response = cJSON_Print(body_obj);
+    return cJSON_Print(body_obj);
 }
 // validate value for key in json response
-static int jsonStrKeyFound(cJSON* obj){
+static int str_key_valid(cJSON* obj){
     return cJSON_IsString(obj) && (obj->valuestring != NULL);
 }
-static int jsonIntKeyFound(cJSON* obj){
+static int int_key_valid(cJSON* obj){
     return cJSON_IsNumber(obj);
 }
+// parse response json body
 static ChatResponse *parse_response(char *response){
     // parse response using cJSON
-    cJSON* json = cJSON_Parse(response);
-    if (json != NULL) {
+    cJSON* parsed_json = cJSON_Parse(response);
+    if (parsed_json != NULL) {
         // create pointer to struct
-        ChatResponse *chatResponsePtr = malloc(sizeof(ChatResponse));
+        ChatResponse *chat_response_ptr = malloc(sizeof(ChatResponse));
         // start parsing away
-        cJSON* idObj = cJSON_GetObjectItemCaseSensitive(json, "id");
-        if (jsonStrKeyFound(idObj)) {
-            chatResponsePtr->id = malloc(strlen(idObj->valuestring));
-            strcpy(chatResponsePtr->id, idObj->valuestring);
+        cJSON* id_str = cJSON_GetObjectItemCaseSensitive(parsed_json, "id");
+        if (str_key_valid(id_str)) {
+            chat_response_ptr->id = malloc(strlen(id_str->valuestring));
+            strcpy(chat_response_ptr->id, id_str->valuestring);
         }
 
-        cJSON* objectObj = cJSON_GetObjectItemCaseSensitive(json, "object");
-        if (jsonStrKeyFound(objectObj)) {
-            chatResponsePtr->object = malloc(strlen(objectObj->valuestring));
-            strcpy(chatResponsePtr->object, objectObj->valuestring);
+        cJSON* object_str = cJSON_GetObjectItemCaseSensitive(parsed_json, "object");
+        if (str_key_valid(object_str)) {
+            chat_response_ptr->object = malloc(strlen(object_str->valuestring));
+            strcpy(chat_response_ptr->object, object_str->valuestring);
         }
 
-        cJSON* createdObj = cJSON_GetObjectItemCaseSensitive(json, "created");
-        if (jsonIntKeyFound(createdObj)) {
-            chatResponsePtr->created = createdObj->valueint;
+        cJSON* created_int = cJSON_GetObjectItemCaseSensitive(parsed_json, "created");
+        if (int_key_valid(created_int)) {
+            chat_response_ptr->created = created_int->valueint;
         }
 
-        cJSON_Delete(json);
-        return chatResponsePtr;
+        cJSON_Delete(parsed_json);
+        return chat_response_ptr;
     }
     return 0;
 }
 // Create a completion for specified chat message
-ChatResponse *create_chat_completion(char *apiKey, char *model, ChatMessage *messages, int messagesSize){
+ChatResponse *create_chat_completion(ChatParams *params){
     CURL *curl;
     CURLcode res;
     // apparently needed for windows?
@@ -92,25 +92,25 @@ ChatResponse *create_chat_completion(char *apiKey, char *model, ChatMessage *mes
     curl = curl_easy_init();
     if (curl) {
         // list of headers
-        struct curl_slist *headersList = NULL;
+        struct curl_slist *headers_list = NULL;
         // add content type to headers since we are sending a json body
-        headersList = curl_slist_append(headersList, "Content-Type: application/json");
+        headers_list = curl_slist_append(headers_list, "Content-Type: application/json");
         // add api key to end of auth header string
-        char authHeader[100] = "Authorization: Bearer ";
-        strcat(authHeader, apiKey);
+        char auth_header[100] = "Authorization: Bearer ";
+        strcat(auth_header, params->apikey);
         // add auth header
-        headersList = curl_slist_append(headersList, authHeader);
+        headers_list = curl_slist_append(headers_list, auth_header);
         // update our headers with the headers list
-        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headersList);
+        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers_list);
         // set request URL
         curl_easy_setopt(curl, CURLOPT_URL, "https://api.openai.com/v1/chat/completions");
         // make sure we send an https request
         curl_easy_setopt(curl, CURLOPT_DEFAULT_PROTOCOL, "https");
         // set request body
-        char *reqBody = build_req_body(model, messages, messagesSize);
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, reqBody);
+        char *req_body = build_req_body(params->model, params->messages, params->messages_size);
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, req_body);
         // set size of request body
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)strlen(reqBody));
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)strlen(req_body));
         // handle our callback for writing the response body to memory
         // first allocate memory for the response body
         ResponseMemory chunk = {.response = malloc(1), .size = 0};
@@ -127,10 +127,10 @@ ChatResponse *create_chat_completion(char *apiKey, char *model, ChatMessage *mes
         }
         // always cleanup so no memory leaks!
         curl_easy_cleanup(curl);
-        curl_slist_free_all(headersList);
+        curl_slist_free_all(headers_list);
         curl_global_cleanup();
         free(chunk.response);
-        free(reqBody);
+        free(req_body);
 
         return chatResp;
     }
