@@ -55,81 +55,69 @@ static int int_key_valid(cJSON *obj){
     return cJSON_IsNumber(obj);
 }
 // parse response json body
-static ChatResponse *parse_response(char *response){
-    // parse response using cJSON
+static ChatCompletion *parse_response(char *response){
+    printf("%s\n", response);
     cJSON *parsed_json = cJSON_Parse(response);
-    if (parsed_json != NULL) {
-        // create pointer to struct
-        ChatResponse *chat_response_ptr = malloc(sizeof(ChatResponse));
-        // start parsing away
-        cJSON *id_str = cJSON_GetObjectItemCaseSensitive(parsed_json, "id");
-        if (str_key_valid(id_str)) {
-            chat_response_ptr->id = malloc(strlen(id_str->valuestring));
-            strcpy(chat_response_ptr->id, id_str->valuestring);
-        }
-
-        cJSON *object_str = cJSON_GetObjectItemCaseSensitive(parsed_json, "object");
-        if (str_key_valid(object_str)) {
-            chat_response_ptr->object = malloc(strlen(object_str->valuestring));
-            strcpy(chat_response_ptr->object, object_str->valuestring);
-        }
-
-        cJSON *created_int = cJSON_GetObjectItemCaseSensitive(parsed_json, "created");
-        if (int_key_valid(created_int)) {
-            chat_response_ptr->created = created_int->valueint;
-        }
-
-        cJSON *model_str = cJSON_GetObjectItemCaseSensitive(parsed_json, "model");
-        if (str_key_valid(model_str)) {
-            chat_response_ptr->model = malloc(strlen(model_str->valuestring));
-            strcpy(chat_response_ptr->model, model_str->valuestring);
-        }
-
-        // cJSON *choices_arr = cJSON_GetObjectItemCaseSensitive(parsed_json, "choices");
-        // cJSON *choice_obj;
-        // Choice choices[cJSON_GetArraySize(choices_arr)];
-        // printf("Array size: %d\n", cJSON_GetArraySize(choices_arr));
-        // // Choice choicesArr[cJSON_GetArraySize(choices_arr)];
-        // int i = 1;
-        // choices[0].finish_reason = "Finish reason 1";
-        // choices[0].index = 100;
-        // // cJSON_ArrayForEach(choice_obj, choices_arr){
-        // //     cJSON *finish_reason = cJSON_GetObjectItemCaseSensitive(choice_obj, "finish_reason");
-        // //     //finish_reason->valuestring
-        // //     choices[i].finish_reason = "munch";
-        // //     // char *json = cJSON_Print(choice_obj);
-        // //     // printf("%s", json);
-        // //     // cJSON_free(json);
-        // //     // cJSON *index = cJSON_GetObjectItemCaseSensitive(choice, "index");
-        // //     // choices_arr[i].index = index->valueint;
-        // //     // cJSON *finish_reason = cJSON_GetObjectItemCaseSensitive(choice, "finish_reason");
-
-
-        // //     // messageObj->content = malloc(strlen(content->valuestring)+1);
-        // //     // choicesArr[i].finish_reason = finish_reason->valuestring;
-            
-        // //     // Message *messageObj = malloc(sizeof(Message));
-        // //     // cJSON *message = cJSON_GetObjectItemCaseSensitive(choice, "message");
-        // //     // cJSON *role = cJSON_GetObjectItemCaseSensitive(message, "role");
-        // //     // messageObj->role = malloc(strlen(role->valuestring)+1);
-        // //     // strcpy(messageObj->role, role->valuestring);
-        // //     // cJSON *content = cJSON_GetObjectItemCaseSensitive(message, "content");
-        // //     // messageObj->content = malloc(strlen(content->valuestring)+1);
-        // //     // strcpy(messageObj->content, content->valuestring);
-        // //     // choicesArr[i].message = messageObj;
-        // //     i++;
-        // // }
-        // // chat_response_ptr->choices = 
-        // chat_response_ptr->choices = choices;
-        // chat_response_ptr->choices_size = i;
+    if (parsed_json == NULL) {
+        // free mem
         cJSON_Delete(parsed_json);
-        return chat_response_ptr;
+        return NULL;
     }
+
+    cJSON *choices = cJSON_GetObjectItem(parsed_json, "choices");
+    int num_choices = cJSON_GetArraySize(choices);
+    ChatCompletion *chat_completion = malloc(sizeof(ChatCompletion));
+    // allocate memory to the pointer
+    chat_completion->choices = malloc(sizeof(Choice) * num_choices);
+    // update num_choices
+    chat_completion->num_choices = num_choices;
+    // parse id
+    char *id_str = cJSON_GetStringValue(cJSON_GetObjectItem(parsed_json, "id"));
+    chat_completion->id = malloc(strlen(id_str));
+    strcpy(chat_completion->id, id_str);
+    // parse object
+    char *object_str = cJSON_GetStringValue(cJSON_GetObjectItem(parsed_json, "object"));
+    chat_completion->object = malloc(strlen(object_str));
+    strcpy(chat_completion->object, object_str);
+    // parse created
+    chat_completion->created = cJSON_GetNumberValue(cJSON_GetObjectItem(parsed_json, "created"));
+    // parse model
+    char *model_str = cJSON_GetStringValue(cJSON_GetObjectItem(parsed_json, "model"));
+    chat_completion->model = malloc(strlen(model_str));
+    strcpy(chat_completion->model, model_str);
+    // parse usage
+    cJSON *usage = cJSON_GetObjectItem(parsed_json, "usage");
+    chat_completion->usage.prompt_tokens = cJSON_GetNumberValue(cJSON_GetObjectItem(usage, "prompt_tokens"));
+    chat_completion->usage.completion_tokens = cJSON_GetNumberValue(cJSON_GetObjectItem(usage, "completion_tokens"));
+    chat_completion->usage.total_tokens = cJSON_GetNumberValue(cJSON_GetObjectItem(usage, "total_tokens"));
+
+    for (int i = 0; i < num_choices; i++) {
+        // get the first item from the choices array "choices":[{"message":{"role":"","content":""}, "finish_reason":"stop","index":0}]
+        cJSON *choice_item = cJSON_GetArrayItem(choices, i);
+        // get the message obj "message":{"role":"","content":""}
+        cJSON *message_item = cJSON_GetObjectItem(choice_item, "message");
+        // parse role
+        char *role_str =  cJSON_GetStringValue(cJSON_GetObjectItem(message_item, "role"));
+        chat_completion->choices[i].message.role  = malloc(strlen(role_str));
+        strcpy(chat_completion->choices[i].message.role, role_str);
+        // parse content
+        char *content_str =  cJSON_GetStringValue(cJSON_GetObjectItem(message_item, "content"));
+        chat_completion->choices[i].message.content  = malloc(strlen(content_str));
+        strcpy(chat_completion->choices[i].message.content, content_str);
+
+        // parse finish_reason
+        char *finish_reason_str = cJSON_GetStringValue(cJSON_GetObjectItem(choice_item, "finish_reason"));
+        chat_completion->choices[i].finish_reason  = malloc(strlen(finish_reason_str));
+        strcpy(chat_completion->choices[i].finish_reason, finish_reason_str);
+        // parse index
+        chat_completion->choices[i].index = cJSON_GetNumberValue(cJSON_GetObjectItem(choice_item, "index"));
+    }
+    // free mem
     cJSON_Delete(parsed_json);
-    return 0;
+    return chat_completion;
 }
 // Create a completion for specified chat message
-ChatResponse *create_chat_completion(ChatParams *params){
+ChatCompletion *create_chat_completion(ChatParams *params){
     CURL *curl;
     CURLcode res;
     // apparently needed for windows?
@@ -165,11 +153,11 @@ ChatResponse *create_chat_completion(ChatParams *params){
         // send the http request
         res = curl_easy_perform(curl);
         // analyze response code
-        ChatResponse *chatResp;
+        ChatCompletion *chat_completion;
         if (res != CURLE_OK) {
             fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
         } else {
-            chatResp = parse_response(chunk.response);
+            chat_completion = parse_response(chunk.response);
         }
         // always cleanup so no memory leaks!
         curl_easy_cleanup(curl);
@@ -178,7 +166,7 @@ ChatResponse *create_chat_completion(ChatParams *params){
         free(chunk.response);
         free(req_body);
 
-        return chatResp;
+        return chat_completion;
     }
     curl_global_cleanup();
     return 0;
