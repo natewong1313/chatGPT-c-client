@@ -26,7 +26,7 @@ curl --version
 
 ## Step 2. Clone repository
 ```
-git clone https://github.com/natewong1313/ChatGPT-C-Client.git
+git clone https://github.com/natewong1313/chatGPT-c-client.git
 ```
 And that's it!
 
