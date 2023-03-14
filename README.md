@@ -12,7 +12,7 @@ This library uses [libcurl](https://curl.se/libcurl/) to make API requests.
 #### Linux
 ```
 sudo apt update && sudo apt upgrade
-sudo apt install curl
+sudo apt-install libcurl4-openssl-dev
 ```
 #### Windows
 ```
