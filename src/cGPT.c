@@ -8,7 +8,7 @@
 // callback from the api request
 // https://curl.se/libcurl/c/CURLOPT_WRITEFUNCTION.html
 static size_t write_memory_callback(void *data, size_t size, size_t nmemb, void *clientp){
-    size_t realsize = size * nmemb;
+    size_t realsize = size  *nmemb;
     ResponseMemory *mem = (ResponseMemory *)clientp;
     char *ptr = realloc(mem->response, mem->size + realsize + 1);
     if(ptr == NULL){
@@ -24,10 +24,13 @@ static size_t write_memory_callback(void *data, size_t size, size_t nmemb, void 
 }
 // take in parameters and return json request body as string
 static char *build_req_body(char *model, ChatMessage *messages, int messages_size){
+    // create object: {}
     cJSON *body_obj = cJSON_CreateObject();
     cJSON *model_str = cJSON_CreateString(model);
+    // {model: ""}
     cJSON_AddItemToObject(body_obj, "model", model_str);
     cJSON *messages_arr = cJSON_CreateArray();
+    // {model: "", messages: []}
     cJSON_AddItemToObject(body_obj, "messages", messages_arr);
     cJSON *message_obj = NULL;
     cJSON *role_str = NULL;
@@ -35,51 +38,94 @@ static char *build_req_body(char *model, ChatMessage *messages, int messages_siz
     for(int i = 0; i < messages_size; i++){
         message_obj = cJSON_CreateObject();
         cJSON_AddItemToArray(messages_arr, message_obj);
-
+        // {model: "", messages: [{role: ""}]}
         role_str = cJSON_CreateString(messages[i].role);
         cJSON_AddItemToObject(message_obj, "role", role_str);
-
+        // {model: "", messages: [{role: "", content: ""}]}
         content_str = cJSON_CreateString(messages[i].content);
         cJSON_AddItemToObject(message_obj, "content", content_str);
     }
-    // char *response = cJSON_Print(body_obj);
     return cJSON_Print(body_obj);
 }
 // validate value for key in json response
-static int str_key_valid(cJSON* obj){
+static int str_key_valid(cJSON *obj){
     return cJSON_IsString(obj) && (obj->valuestring != NULL);
 }
-static int int_key_valid(cJSON* obj){
+static int int_key_valid(cJSON *obj){
     return cJSON_IsNumber(obj);
 }
 // parse response json body
 static ChatResponse *parse_response(char *response){
     // parse response using cJSON
-    cJSON* parsed_json = cJSON_Parse(response);
+    cJSON *parsed_json = cJSON_Parse(response);
     if (parsed_json != NULL) {
         // create pointer to struct
         ChatResponse *chat_response_ptr = malloc(sizeof(ChatResponse));
         // start parsing away
-        cJSON* id_str = cJSON_GetObjectItemCaseSensitive(parsed_json, "id");
+        cJSON *id_str = cJSON_GetObjectItemCaseSensitive(parsed_json, "id");
         if (str_key_valid(id_str)) {
             chat_response_ptr->id = malloc(strlen(id_str->valuestring));
             strcpy(chat_response_ptr->id, id_str->valuestring);
         }
 
-        cJSON* object_str = cJSON_GetObjectItemCaseSensitive(parsed_json, "object");
+        cJSON *object_str = cJSON_GetObjectItemCaseSensitive(parsed_json, "object");
         if (str_key_valid(object_str)) {
             chat_response_ptr->object = malloc(strlen(object_str->valuestring));
             strcpy(chat_response_ptr->object, object_str->valuestring);
         }
 
-        cJSON* created_int = cJSON_GetObjectItemCaseSensitive(parsed_json, "created");
+        cJSON *created_int = cJSON_GetObjectItemCaseSensitive(parsed_json, "created");
         if (int_key_valid(created_int)) {
             chat_response_ptr->created = created_int->valueint;
         }
 
+        cJSON *model_str = cJSON_GetObjectItemCaseSensitive(parsed_json, "model");
+        if (str_key_valid(model_str)) {
+            chat_response_ptr->model = malloc(strlen(model_str->valuestring));
+            strcpy(chat_response_ptr->model, model_str->valuestring);
+        }
+
+        // cJSON *choices_arr = cJSON_GetObjectItemCaseSensitive(parsed_json, "choices");
+        // cJSON *choice_obj;
+        // Choice choices[cJSON_GetArraySize(choices_arr)];
+        // printf("Array size: %d\n", cJSON_GetArraySize(choices_arr));
+        // // Choice choicesArr[cJSON_GetArraySize(choices_arr)];
+        // int i = 1;
+        // choices[0].finish_reason = "Finish reason 1";
+        // choices[0].index = 100;
+        // // cJSON_ArrayForEach(choice_obj, choices_arr){
+        // //     cJSON *finish_reason = cJSON_GetObjectItemCaseSensitive(choice_obj, "finish_reason");
+        // //     //finish_reason->valuestring
+        // //     choices[i].finish_reason = "munch";
+        // //     // char *json = cJSON_Print(choice_obj);
+        // //     // printf("%s", json);
+        // //     // cJSON_free(json);
+        // //     // cJSON *index = cJSON_GetObjectItemCaseSensitive(choice, "index");
+        // //     // choices_arr[i].index = index->valueint;
+        // //     // cJSON *finish_reason = cJSON_GetObjectItemCaseSensitive(choice, "finish_reason");
+
+
+        // //     // messageObj->content = malloc(strlen(content->valuestring)+1);
+        // //     // choicesArr[i].finish_reason = finish_reason->valuestring;
+            
+        // //     // Message *messageObj = malloc(sizeof(Message));
+        // //     // cJSON *message = cJSON_GetObjectItemCaseSensitive(choice, "message");
+        // //     // cJSON *role = cJSON_GetObjectItemCaseSensitive(message, "role");
+        // //     // messageObj->role = malloc(strlen(role->valuestring)+1);
+        // //     // strcpy(messageObj->role, role->valuestring);
+        // //     // cJSON *content = cJSON_GetObjectItemCaseSensitive(message, "content");
+        // //     // messageObj->content = malloc(strlen(content->valuestring)+1);
+        // //     // strcpy(messageObj->content, content->valuestring);
+        // //     // choicesArr[i].message = messageObj;
+        // //     i++;
+        // // }
+        // // chat_response_ptr->choices = 
+        // chat_response_ptr->choices = choices;
+        // chat_response_ptr->choices_size = i;
         cJSON_Delete(parsed_json);
         return chat_response_ptr;
     }
+    cJSON_Delete(parsed_json);
     return 0;
 }
 // Create a completion for specified chat message
