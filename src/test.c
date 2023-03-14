@@ -3,7 +3,6 @@
 #include <string.h>
 #include "cGPT.h"
 #include <stdio.h>
-#include <curl/curl.h>
 
 int main(){
     ChatMessage messages[1] = {{

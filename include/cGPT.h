@@ -18,26 +18,6 @@ typedef struct {
     size_t size;
 } ResponseMemory;
 
-// typedef struct {
-//     char *role;
-//     char *content;
-// } Message;
-
-// typedef struct {
-//     int index;
-//     Message *message;
-//     char *finish_reason;
-// } Choice;
-
-// typedef struct {
-//     char *id;
-//     char *object;
-//     int created;
-//     char *model;
-//     Choice *choices;
-//     int choices_size;
-// } ChatResponse;
-
 typedef struct {
     int prompt_tokens;
     int completion_tokens;
