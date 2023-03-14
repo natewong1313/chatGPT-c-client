@@ -4,3 +4,5 @@ build
 src/obj/**
 src/cgpt*
 .DS_Store
+tests/obj/**
+tests/cgpt*

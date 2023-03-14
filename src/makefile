@@ -3,14 +3,13 @@ CC=gcc
 CFLAGS=-I$(IDIR)
 
 ODIR=obj
-LDIR =../lib
 
 LIBS=-lcurl
 
 _DEPS = cGPT.h cJSON.h
 DEPS = $(patsubst %,$(IDIR)/%,$(_DEPS))
 
-_OBJ = main.o cGPT.o cJSON.o
+_OBJ = test.o ../cGPT.o cJSON.o
 OBJ = $(patsubst %,$(ODIR)/%,$(_OBJ))
 
 $(ODIR)/%.o: %.c $(DEPS)
@@ -22,4 +21,4 @@ cgpt: $(OBJ)
 .PHONY: clean
 
 clean:
-	rm -f $(ODIR)/*.o *~ core $(INCDIR)/*~ 
+	rm -f $(ODIR)/*.o *~ core $(INCDIR)/*~  *.o
