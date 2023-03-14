@@ -41,7 +41,7 @@ To use this library, you'll need to include the cGPT and cJSON header and source
 │   └── cJSON.c
 └── ...
 ```
-
+> When building your project, make sure to include the libcurl library `-lcurl` in your makefile.
 
 ## Basic example
 ```c
@@ -65,7 +65,6 @@ int main(){
     return 0;
 }
 ```
-When building this example, make sure to include the libcurl library `-lcurl` in your makefile.
 
 ## ChatCompletion structure
 The create_chat_completion function returns a pointer to a ChatCompletion struct. Here's what it looks like
@@ -98,3 +97,6 @@ typedef struct {
 } ChatCompletion;
 ```
 You can view the original json response of the OpenAI api [here](https://platform.openai.com/docs/api-reference/chat/create)
+
+# License
+This project is [MIT licensed](LICENSE)
