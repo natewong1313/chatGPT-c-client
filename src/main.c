@@ -34,16 +34,5 @@ int main(){
     }
     free(chat_completion->choices);
     free(chat_completion);
-    // Choice *choices = chat_resp->choices;
-    // printf("choices: [\n");
-    // for(int i = 0; i < chat_resp->choices_size; i++){
-    //     printf("{\n");
-    //     printf("    index: %d\n", chat_resp->choices[i].index);
-    //     // printf("    finish_reason: %s\n", chat_resp->choices[i].finish_reason);
-    //     // chat_resp->choices[i];
-       
-    //     // printf("%s\n", choices[i].message->role);
-    //     printf("}\n");
-    // }
     return 0;
 }
