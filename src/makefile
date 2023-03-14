@@ -13,6 +13,7 @@ _OBJ = test.o cGPT.o cJSON.o
 OBJ = $(patsubst %,$(ODIR)/%,$(_OBJ))
 
 $(ODIR)/%.o: %.c $(DEPS)
+	@mkdir -p $(@D)
 	$(CC) -c -o $@ $< $(CFLAGS)
 
 cgpt: $(OBJ)
